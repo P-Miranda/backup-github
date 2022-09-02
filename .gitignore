@@ -1,0 +1,4 @@
+.token
+.venv/**
+clone_dir/**
+archive_dir/**
