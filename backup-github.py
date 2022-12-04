@@ -1,19 +1,38 @@
 #!/usr/bin/env python3
 # Python script to backup user repositories from Github
 
-import sys
 import re
 import subprocess
 from github import Github
+import argparse
 
 
-def usage():
-    print("Usage: [VENV] backup-github.py [TOKEN] [GH_USER] (CLONE) (ARCHIVE)")
-    print("   [VENV]: path to virtual environment python interpreter")
-    print("   [TOKEN]: path to file containing github access token")
-    print("   [GH_USER]: Github account user name")
-    print("   (CLONE): path to clone directory (optional)")
-    print("   (ARCHIVE): path to archive directory (optional)")
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        prog="backup-github", description="Clone and archive github repositories"
+    )
+    parser.add_argument(
+        "token_file",
+        type=str,
+        help="Path to file containing github access token with repository permissions",
+    )
+    parser.add_argument("gh_user", type=str, help="Github account user name")
+    parser.add_argument(
+        "clone_dir",
+        nargs="?",
+        default="clone_dir",
+        type=str,
+        help="Path to clone directory (optional)",
+    )
+    parser.add_argument(
+        "archive_dir",
+        nargs="?",
+        default="archive_dir",
+        type=str,
+        help="Path to archive directory (optional)",
+    )
+
+    return parser.parse_args()
 
 
 def get_gh_token(token_file):
@@ -63,41 +82,31 @@ def archive_all_repos(clone_dir, archive_dir):
         ["find", clone_dir, "-maxdepth", "1", "-mindepth", "1", "-type", "d"]
     )
     source_dirs = find_proc.decode("utf-8").split("\n")
-    print(source_dirs)
 
     for src_dir in source_dirs:
         if src_dir:
+            print(f"Archiving {src_dir}")
             dst_name = f"{archive_dir}/{src_dir.split('/')[-1]}.tar.gz"
-            subprocess.run(["tar", "-zcvf", dst_name, src_dir])
+            subprocess.run(["tar", "-zcf", dst_name, src_dir])
 
 
 if __name__ == "__main__":
     print("Backup Github Repositories")
-    if len(sys.argv) < 3:
-        usage()
-        sys.exit()
 
-    token_file = sys.argv[1]
-    user_name = sys.argv[2]
-    if len(sys.argv) > 4:
-        clone_dir = sys.argv[3]
-        archive_dir = sys.argv[4]
-    else:
-        clone_dir = "clone_dir"
-        archive_dir = "archive_dir"
+    args = parse_arguments()
 
-    gh_token = get_gh_token(token_file)
+    gh_token = get_gh_token(args.token_file)
 
     gh = Github(gh_token)
     user_repos = gh.get_user().get_repos()
 
-    user_repos = filter_repos(user_repos, user_name)
+    user_repos = filter_repos(user_repos, args.gh_user)
     filtered_repos = special_repo_filter(user_repos)
 
-    clone_all_repos(gh_token, filtered_repos, clone_dir)
+    clone_all_repos(gh_token, filtered_repos, args.clone_dir)
 
-    archive_all_repos(clone_dir, archive_dir)
+    archive_all_repos(args.clone_dir, args.archive_dir)
 
     print("Backup complete")
-    print(f"Check {clone_dir} for repository clones.")
-    print(f"Check {archive_dir} for repository archives.")
+    print(f"Check {args.clone_dir} for repository clones.")
+    print(f"Check {args.archive_dir} for repository archives.")
